@@ -12,5 +12,7 @@
     <string name="take_photo_help">Touch anywhere on screen to take picture</string>
     <string name="age_gender_mode">Detect Age and Gender</string>
     <string name="ocr_mode">OCR</string>
+    <string name="face_api_url">https://api.projectoxford.ai/face/v0/detections?analyzesAge=true&amp;analyzesGender=true</string>
+    <string name="ocr_api_url">https://api.projectoxford.ai/vision/v1/ocr?language=zh-Hans&amp;detectOrientation =true</string>
 
 </resources>

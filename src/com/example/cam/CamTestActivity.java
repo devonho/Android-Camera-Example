@@ -44,6 +44,7 @@ import android.os.Environment;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -64,6 +65,9 @@ public class CamTestActivity extends Activity {
 	Context ctx;
 	JSONObject faceAttributes;
 	
+	public enum DetectMode {AGE_GENDER, OCR};
+	DetectMode currentMode;	
+	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -71,7 +75,8 @@ public class CamTestActivity extends Activity {
 		act = this;
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-
+		currentMode = DetectMode.AGE_GENDER;
+		
 		setContentView(R.layout.main);
 
 		preview = new Preview(this, (SurfaceView)findViewById(R.id.surfaceView));
@@ -145,6 +150,21 @@ public class CamTestActivity extends Activity {
 	    return true;
 	}	
 	
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+	    // Handle item selection
+	    switch (item.getItemId()) {
+	        case R.id.ocr_mode:
+	        	currentMode = DetectMode.OCR;
+	            return true;
+	        case R.id.age_gender_mode:
+	        	currentMode = DetectMode.AGE_GENDER;
+	            return true;
+	        default:
+	            return super.onOptionsItemSelected(item);
+	    }
+	}	
+	
 	private void resetCam() {
 		camera.startPreview();
 		preview.setCamera(camera);
@@ -156,6 +176,41 @@ public class CamTestActivity extends Activity {
 		sendBroadcast(mediaScanIntent);
 	}
 
+	private void handleHttpResponse(String rsp) {
+		if(currentMode == DetectMode.AGE_GENDER) {	
+			try {
+		        JSONArray jarr;
+				jarr = (JSONArray) new JSONTokener(rsp).nextValue();
+		        JSONObject json = (JSONObject) jarr.get(0);
+		        faceAttributes = (JSONObject)json.get("attributes");
+		        makeToast("Age: " + faceAttributes.getString("age") + " Gender: " + faceAttributes.getString("gender"));
+			} catch (JSONException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+		} else if(currentMode == DetectMode.OCR) {
+			try {
+		        JSONArray jarr;
+				jarr = (JSONArray) new JSONTokener(rsp).nextValue();
+		        JSONObject json = (JSONObject) jarr.get(0);
+		        faceAttributes = (JSONObject)json.get("attributes");
+		        makeToast("Age: " + faceAttributes.getString("age") + " Gender: " + faceAttributes.getString("gender"));
+			} catch (JSONException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			
+		}
+	}
+	
+	private void makeToast(final String msg) {
+        act.runOnUiThread(new Runnable() {
+      	  public void run() {
+      	    Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show();
+      	  }
+      	});	            		
+	}
+	
 	ShutterCallback shutterCallback = new ShutterCallback() {
 		public void onShutter() {
 			//			 Log.d(TAG, "onShutter'd");
@@ -209,18 +264,27 @@ public class CamTestActivity extends Activity {
 			} finally {
 			}
 			*/
-			makePostRequest(data[0]);
+			makePostRequest(data[0], currentMode);
 			
 			return null;
 		}
 
-	    private void makePostRequest(byte[] img) {
+	    private void makePostRequest(byte[] img, CamTestActivity.DetectMode mode) {
 	    	 
+	    	String apikey="", url="";	    	
+	    	if(mode == DetectMode.OCR) {
+	    		url = getString(R.string.ocr_api_url);
+	    		apikey = getString(R.string.ComputerVisionAPIs);
+	    	}
+	    	else if(mode == DetectMode.AGE_GENDER){
+	    		url = getString(R.string.face_api_url);
+	    		apikey = getString(R.string.FaceAPIs);	    		
+	    	}
 	        
 	        HttpClient httpClient = new DefaultHttpClient();
-	        HttpPost httpPost = new HttpPost("https://api.projectoxford.ai/face/v0/detections?analyzesAge=true&analyzesGender=true");
+	        HttpPost httpPost = new HttpPost(url);
 	 
-	        httpPost.setHeader("Ocp-Apim-Subscription-Key", getString(R.string.FaceAPIs));
+	        httpPost.setHeader("Ocp-Apim-Subscription-Key", apikey);
 	        httpPost.setHeader("Content-Type","application/octet-stream");	        
       
 	        try {
@@ -229,7 +293,6 @@ public class CamTestActivity extends Activity {
 	            // log exception
 	            e.printStackTrace();	        	
 	        }
-     
 	 
 	        //making POST request.
 	        try {
@@ -237,21 +300,7 @@ public class CamTestActivity extends Activity {
 	            // write response to log            
 	            String rspentity =  EntityUtils.toString(response.getEntity());
 	            Log.d(TAG, "Http Post Response:" + rspentity);
-	            
-	            JSONArray jarr = (JSONArray) new JSONTokener(rspentity).nextValue();
-	            JSONObject json = (JSONObject) jarr.get(0);
-	            faceAttributes = (JSONObject)json.get("attributes");
-	            
-	            act.runOnUiThread(new Runnable() {
-	            	  public void run() {
-	            	    try {
-							Toast.makeText(ctx, "Age: " + faceAttributes.getString("age") + " Gender: " + faceAttributes.getString("gender"), Toast.LENGTH_LONG).show();
-						} catch (JSONException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-	            	  }
-	            	});	            
+	            handleHttpResponse(rspentity);
 	            
 	        } catch (ClientProtocolException e) {
 	            // Log exception
@@ -259,10 +308,7 @@ public class CamTestActivity extends Activity {
 	        } catch (IOException e) {
 	            // Log exception
 	            e.printStackTrace();
-	        } catch (JSONException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+	        }
 	 
 	    }    
 		
