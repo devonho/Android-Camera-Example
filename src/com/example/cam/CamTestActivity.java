@@ -31,10 +31,12 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.Camera;
+import android.hardware.Camera.AutoFocusCallback;
 import android.hardware.Camera.PictureCallback;
 import android.hardware.Camera.ShutterCallback;
 import android.net.Uri;
@@ -75,7 +77,7 @@ public class CamTestActivity extends Activity {
 		act = this;
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-		currentMode = DetectMode.AGE_GENDER;
+		currentMode = DetectMode.OCR;
 		
 		setContentView(R.layout.main);
 
@@ -88,7 +90,9 @@ public class CamTestActivity extends Activity {
 
 			@Override
 			public void onClick(View arg0) {
-				camera.takePicture(shutterCallback, rawCallback, jpegCallback);
+				//camera.takePicture(shutterCallback, rawCallback, jpegCallback);
+				camera.autoFocus(afCallback);
+
 			}
 		});
 
@@ -123,7 +127,7 @@ public class CamTestActivity extends Activity {
 		int numCams = Camera.getNumberOfCameras();
 		if(numCams > 0){
 			try{
-				camera = Camera.open(1);
+				camera = Camera.open(0);
 				camera.startPreview();
 				preview.setCamera(camera);
 			} catch (RuntimeException ex){
@@ -190,11 +194,28 @@ public class CamTestActivity extends Activity {
 			}
 		} else if(currentMode == DetectMode.OCR) {
 			try {
-		        JSONArray jarr;
-				jarr = (JSONArray) new JSONTokener(rsp).nextValue();
-		        JSONObject json = (JSONObject) jarr.get(0);
-		        faceAttributes = (JSONObject)json.get("attributes");
-		        makeToast("Age: " + faceAttributes.getString("age") + " Gender: " + faceAttributes.getString("gender"));
+				String ocrtext = "";
+				JSONObject jrsp;
+				jrsp = (JSONObject) new JSONTokener(rsp).nextValue();
+				JSONArray jregions = (JSONArray)jrsp.get("regions");
+				
+				for(int i=0; i < jregions.length(); i++) {
+					JSONObject jregion = jregions.getJSONObject(i);
+					
+					JSONArray jlines = (JSONArray) jregion.get("lines");
+					for(int j=0;j<jlines.length();j++) {
+						JSONObject jline = jlines.getJSONObject(j);
+						JSONArray jwords = jline.getJSONArray("words");
+						
+						for(int k=0;k<jwords.length();k++) {
+							JSONObject jword = jwords.getJSONObject(k);
+							ocrtext = ocrtext + jword.get("text").toString() + " ";
+						}
+						
+					}
+				}
+				
+		        makeToast(ocrtext);
 			} catch (JSONException e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
@@ -231,7 +252,12 @@ public class CamTestActivity extends Activity {
 		}
 	};
 
-	
+	AutoFocusCallback afCallback = new AutoFocusCallback() {
+		public void onAutoFocus(boolean success, Camera camera) {
+			if(success)
+				camera.takePicture(shutterCallback, rawCallback, jpegCallback);
+		}
+	};
 	
 	private class SaveImageTask extends AsyncTask<byte[], Void, Void> {
 
