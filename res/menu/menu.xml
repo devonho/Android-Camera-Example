@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/age_gender_mode"
+          android:title="@string/age_gender_mode"
+          android:visible="true" android:enabled="true"/>
+    <item android:id="@+id/ocr_mode"
+          android:title="@string/ocr_mode"
+           android:visible="true" android:enabled="true"/>
+</menu>

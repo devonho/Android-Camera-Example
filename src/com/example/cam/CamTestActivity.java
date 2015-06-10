@@ -8,6 +8,28 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.MalformedURLException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+
 
 import android.app.Activity;
 import android.content.Context;
@@ -20,6 +42,8 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -38,7 +62,8 @@ public class CamTestActivity extends Activity {
 	Camera camera;
 	Activity act;
 	Context ctx;
-
+	JSONObject faceAttributes;
+	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -93,7 +118,7 @@ public class CamTestActivity extends Activity {
 		int numCams = Camera.getNumberOfCameras();
 		if(numCams > 0){
 			try{
-				camera = Camera.open(0);
+				camera = Camera.open(1);
 				camera.startPreview();
 				preview.setCamera(camera);
 			} catch (RuntimeException ex){
@@ -113,6 +138,13 @@ public class CamTestActivity extends Activity {
 		super.onPause();
 	}
 
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+	    MenuInflater inflater = getMenuInflater();
+	    inflater.inflate(R.menu.menu, menu);
+	    return true;
+	}	
+	
 	private void resetCam() {
 		camera.startPreview();
 		preview.setCamera(camera);
@@ -144,6 +176,8 @@ public class CamTestActivity extends Activity {
 		}
 	};
 
+	
+	
 	private class SaveImageTask extends AsyncTask<byte[], Void, Void> {
 
 		@Override
@@ -151,6 +185,7 @@ public class CamTestActivity extends Activity {
 			FileOutputStream outStream = null;
 
 			// Write to SD Card
+			/*
 			try {
 				File sdCard = Environment.getExternalStorageDirectory();
 				File dir = new File (sdCard.getAbsolutePath() + "/camtest");
@@ -173,9 +208,64 @@ public class CamTestActivity extends Activity {
 				e.printStackTrace();
 			} finally {
 			}
+			*/
+			makePostRequest(data[0]);
+			
 			return null;
 		}
 
+	    private void makePostRequest(byte[] img) {
+	    	 
+	        
+	        HttpClient httpClient = new DefaultHttpClient();
+	        HttpPost httpPost = new HttpPost("https://api.projectoxford.ai/face/v0/detections?analyzesAge=true&analyzesGender=true");
+	 
+	        httpPost.setHeader("Ocp-Apim-Subscription-Key", getString(R.string.FaceAPIs));
+	        httpPost.setHeader("Content-Type","application/octet-stream");	        
+      
+	        try {
+	        	httpPost.setEntity(new ByteArrayEntity(img));
+	        } catch(Exception e) {
+	            // log exception
+	            e.printStackTrace();	        	
+	        }
+     
+	 
+	        //making POST request.
+	        try {
+	            HttpResponse response = httpClient.execute(httpPost);
+	            // write response to log            
+	            String rspentity =  EntityUtils.toString(response.getEntity());
+	            Log.d(TAG, "Http Post Response:" + rspentity);
+	            
+	            JSONArray jarr = (JSONArray) new JSONTokener(rspentity).nextValue();
+	            JSONObject json = (JSONObject) jarr.get(0);
+	            faceAttributes = (JSONObject)json.get("attributes");
+	            
+	            act.runOnUiThread(new Runnable() {
+	            	  public void run() {
+	            	    try {
+							Toast.makeText(ctx, "Age: " + faceAttributes.getString("age") + " Gender: " + faceAttributes.getString("gender"), Toast.LENGTH_LONG).show();
+						} catch (JSONException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+	            	  }
+	            	});	            
+	            
+	        } catch (ClientProtocolException e) {
+	            // Log exception
+	            e.printStackTrace();
+	        } catch (IOException e) {
+	            // Log exception
+	            e.printStackTrace();
+	        } catch (JSONException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+	 
+	    }    
+		
 	}
 }
 
